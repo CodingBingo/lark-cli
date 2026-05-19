@@ -7,8 +7,9 @@ const { execFileSync } = require("child_process");
 const os = require("os");
 const crypto = require("crypto");
 
-const VERSION = require("../package.json").version.replace(/-.*$/, "");
-const REPO = "larksuite/cli";
+const PKG = require("../package.json");
+const VERSION = PKG.version.replace(/-.*$/, "");
+const DEFAULT_RELEASE_REPO = "CodingBingo/lark-cli";
 const NAME = "lark-cli";
 const DEFAULT_MIRROR_HOST = "https://registry.npmmirror.com";
 // Allowlist gates the *initial* request URL only. curl --location follows
@@ -38,10 +39,46 @@ const arch = ARCH_MAP[process.arch];
 const isWindows = process.platform === "win32";
 const ext = isWindows ? ".zip" : ".tar.gz";
 const archiveName = `${NAME}-${VERSION}-${platform}-${arch}${ext}`;
-const GITHUB_URL = `https://github.com/${REPO}/releases/download/v${VERSION}/${archiveName}`;
 
 const binDir = path.join(__dirname, "..", "bin");
 const dest = path.join(binDir, NAME + (isWindows ? ".exe" : ""));
+
+function normalizeGitHubRepo(raw) {
+  const value = (raw || "").trim();
+  if (!value) {
+    return "";
+  }
+  const sshMatch = value.match(/^[^@]+@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i);
+  if (sshMatch) {
+    return sshMatch[1];
+  }
+  const httpsMatch = value.match(/^(?:git\+)?https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i);
+  if (httpsMatch) {
+    return httpsMatch[1];
+  }
+  const plainMatch = value.match(/^[^/\s]+\/[^/\s]+$/);
+  if (plainMatch) {
+    return value.replace(/\.git$/i, "");
+  }
+  return "";
+}
+
+function resolveReleaseRepo(env = process.env, pkg = PKG) {
+  const envRepo = normalizeGitHubRepo(env.LARK_CLI_RELEASE_REPO);
+  if (envRepo) {
+    return envRepo;
+  }
+  const repoField = typeof pkg?.repository === "string" ? pkg.repository : pkg?.repository?.url;
+  const pkgRepo = normalizeGitHubRepo(repoField);
+  if (pkgRepo) {
+    return pkgRepo;
+  }
+  return DEFAULT_RELEASE_REPO;
+}
+
+function buildGitHubReleaseUrl(repo, version, archive) {
+  return `https://github.com/${repo}/releases/download/v${version}/${archive}`;
+}
 
 // Build the ordered list of binary mirror URLs to try. Resolution rules:
 //   1. npm_config_registry     — when the user has set a non-default
@@ -162,8 +199,9 @@ function extractZipWindows(archivePath, destDir) {
 }
 
 function install() {
+  const githubUrl = buildGitHubReleaseUrl(resolveReleaseRepo(), VERSION, archiveName);
   const mirrorUrls = getMirrorUrls(process.env);
-  const downloadUrls = [GITHUB_URL, ...mirrorUrls];
+  const downloadUrls = [githubUrl, ...mirrorUrls];
 
   fs.mkdirSync(binDir, { recursive: true });
 
@@ -294,4 +332,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { getExpectedChecksum, verifyChecksum, assertAllowedHost, resolveMirrorUrls };
+module.exports = {
+  assertAllowedHost,
+  buildGitHubReleaseUrl,
+  getExpectedChecksum,
+  resolveMirrorUrls,
+  resolveReleaseRepo,
+  verifyChecksum,
+};

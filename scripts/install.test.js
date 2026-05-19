@@ -9,7 +9,14 @@ const os = require("os");
 
 const crypto = require("crypto");
 
-const { getExpectedChecksum, verifyChecksum, assertAllowedHost, resolveMirrorUrls } = require("./install.js");
+const {
+  assertAllowedHost,
+  buildGitHubReleaseUrl,
+  getExpectedChecksum,
+  resolveMirrorUrls,
+  resolveReleaseRepo,
+  verifyChecksum,
+} = require("./install.js");
 
 describe("getExpectedChecksum", () => {
   function makeTmpChecksums(content) {
@@ -161,6 +168,42 @@ describe("assertAllowedHost", () => {
     assert.throws(
       () => assertAllowedHost("not-a-url"),
       TypeError
+    );
+  });
+});
+
+describe("resolveReleaseRepo", () => {
+  it("uses LARK_CLI_RELEASE_REPO when set", () => {
+    assert.equal(
+      resolveReleaseRepo({ LARK_CLI_RELEASE_REPO: "acme/internal-cli" }, {}),
+      "acme/internal-cli"
+    );
+  });
+
+  it("derives the repo from package.repository.url", () => {
+    assert.equal(
+      resolveReleaseRepo({}, { repository: { url: "git+https://github.com/CodingBingo/lark-cli.git" } }),
+      "CodingBingo/lark-cli"
+    );
+  });
+
+  it("derives the repo from ssh package.repository.url", () => {
+    assert.equal(
+      resolveReleaseRepo({}, { repository: { url: "git@github.com:CodingBingo/lark-cli.git" } }),
+      "CodingBingo/lark-cli"
+    );
+  });
+
+  it("falls back to the default internal repo", () => {
+    assert.equal(resolveReleaseRepo({}, {}), "CodingBingo/lark-cli");
+  });
+});
+
+describe("buildGitHubReleaseUrl", () => {
+  it("builds a GitHub releases asset URL for the resolved repo", () => {
+    assert.equal(
+      buildGitHubReleaseUrl("CodingBingo/lark-cli", "1.0.34", "lark-cli-1.0.34-darwin-arm64.tar.gz"),
+      "https://github.com/CodingBingo/lark-cli/releases/download/v1.0.34/lark-cli-1.0.34-darwin-arm64.tar.gz"
     );
   });
 });
