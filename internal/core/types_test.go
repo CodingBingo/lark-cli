@@ -3,7 +3,11 @@
 
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/larksuite/cli/internal/envvars"
+)
 
 func TestResolveEndpoints_Feishu(t *testing.T) {
 	ep := ResolveEndpoints(BrandFeishu)
@@ -50,5 +54,34 @@ func TestResolveOpenBaseURL(t *testing.T) {
 	}
 	if got := ResolveOpenBaseURL(BrandLark); got != "https://open.larksuite.com" {
 		t.Errorf("ResolveOpenBaseURL(lark) = %q", got)
+	}
+}
+
+func TestResolveEndpoints_EnvOverrides(t *testing.T) {
+	t.Setenv(envvars.CliOpenBaseURL, "open.internal.example/")
+	t.Setenv(envvars.CliAccountsBaseURL, "http://accounts.internal.example/")
+	t.Setenv(envvars.CliMCPBaseURL, " https://mcp.internal.example/base/ ")
+	t.Setenv(envvars.CliAppLinkBaseURL, "applink.internal.example")
+
+	ep := ResolveEndpoints(BrandFeishu)
+	if ep.Open != "https://open.internal.example" {
+		t.Errorf("Open = %q, want env override", ep.Open)
+	}
+	if ep.Accounts != "http://accounts.internal.example" {
+		t.Errorf("Accounts = %q, want env override", ep.Accounts)
+	}
+	if ep.MCP != "https://mcp.internal.example/base" {
+		t.Errorf("MCP = %q, want env override", ep.MCP)
+	}
+	if ep.AppLink != "https://applink.internal.example" {
+		t.Errorf("AppLink = %q, want env override", ep.AppLink)
+	}
+}
+
+func TestResolveOpenBaseURL_UsesEnvOverride(t *testing.T) {
+	t.Setenv(envvars.CliOpenBaseURL, "open.override.example")
+
+	if got := ResolveOpenBaseURL(BrandLark); got != "https://open.override.example" {
+		t.Errorf("ResolveOpenBaseURL(lark) = %q, want env override", got)
 	}
 }

@@ -5,6 +5,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/larksuite/cli/internal/cmdutil"
 	"github.com/larksuite/cli/internal/core"
 	"github.com/larksuite/cli/internal/credential"
+	"github.com/larksuite/cli/internal/envvars"
 	"github.com/larksuite/cli/internal/keychain"
 	"github.com/larksuite/cli/internal/output"
 )
@@ -133,6 +135,54 @@ func TestConfigShowRun_NoActiveProfileReturnsStructuredError(t *testing.T) {
 	}
 	if exitErr.Detail == nil || exitErr.Detail.Type != "config" || exitErr.Detail.Message != "no active profile" {
 		t.Fatalf("detail = %#v, want config/no active profile", exitErr.Detail)
+	}
+}
+
+func TestConfigShowRun_IncludesResolvedEndpoints(t *testing.T) {
+	t.Setenv("LARKSUITE_CLI_CONFIG_DIR", t.TempDir())
+	t.Setenv(envvars.CliOpenBaseURL, "open.internal.example")
+	t.Setenv(envvars.CliAccountsBaseURL, "accounts.internal.example")
+	t.Setenv(envvars.CliMCPBaseURL, "mcp.internal.example")
+	t.Setenv(envvars.CliAppLinkBaseURL, "applink.internal.example")
+
+	multi := &core.MultiAppConfig{
+		CurrentApp: "default",
+		Apps: []core.AppConfig{{
+			Name:      "default",
+			AppId:     "app-default",
+			AppSecret: core.PlainSecret("secret-default"),
+			Brand:     core.BrandFeishu,
+		}},
+	}
+	if err := core.SaveMultiAppConfig(multi); err != nil {
+		t.Fatalf("SaveMultiAppConfig() error = %v", err)
+	}
+
+	f, stdout, _, _ := cmdutil.TestFactory(t, nil)
+	if err := configShowRun(&ConfigShowOptions{Factory: f}); err != nil {
+		t.Fatalf("configShowRun() error = %v", err)
+	}
+
+	var envelope map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	endpoints, ok := envelope["endpoints"].(map[string]any)
+	if !ok {
+		t.Fatalf("endpoints = %#v, want object", envelope["endpoints"])
+	}
+	if got := endpoints["open"]; got != "https://open.internal.example" {
+		t.Errorf("endpoints.open = %#v, want env override", got)
+	}
+	if got := endpoints["accounts"]; got != "https://accounts.internal.example" {
+		t.Errorf("endpoints.accounts = %#v, want env override", got)
+	}
+	if got := endpoints["mcp"]; got != "https://mcp.internal.example" {
+		t.Errorf("endpoints.mcp = %#v, want env override", got)
+	}
+	if got := endpoints["appLink"]; got != "https://applink.internal.example" {
+		t.Errorf("endpoints.appLink = %#v, want env override", got)
 	}
 }
 

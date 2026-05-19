@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/larksuite/cli/internal/core"
+	"github.com/larksuite/cli/internal/envvars"
 	"github.com/larksuite/cli/internal/httpmock"
 	"github.com/larksuite/cli/internal/keychain"
 )
@@ -44,6 +45,19 @@ func TestResolveOAuthEndpoints_Lark(t *testing.T) {
 	}
 	if ep.Token != "https://open.larksuite.com/open-apis/authen/v2/oauth/token" {
 		t.Errorf("Token = %q", ep.Token)
+	}
+}
+
+func TestResolveOAuthEndpoints_EnvOverrides(t *testing.T) {
+	t.Setenv(envvars.CliAccountsBaseURL, "accounts.internal.example")
+	t.Setenv(envvars.CliOpenBaseURL, "http://open.internal.example/")
+
+	ep := ResolveOAuthEndpoints(core.BrandFeishu)
+	if ep.DeviceAuthorization != "https://accounts.internal.example/oauth/v1/device_authorization" {
+		t.Errorf("DeviceAuthorization = %q, want env override", ep.DeviceAuthorization)
+	}
+	if ep.Token != "http://open.internal.example/open-apis/authen/v2/oauth/token" {
+		t.Errorf("Token = %q, want env override", ep.Token)
 	}
 }
 

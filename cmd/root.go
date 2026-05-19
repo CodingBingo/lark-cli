@@ -411,11 +411,10 @@ func enrichPermissionError(f *cmdutil.Factory, exitErr *output.ExitError) {
 	}
 
 	// Build admin console URL with the recommended scope
-	host := "open.feishu.cn"
-	if cfg.Brand == "lark" {
-		host = "open.larksuite.com"
-	}
-	consoleURL := fmt.Sprintf("https://%s/page/scope-apply?clientID=%s&scopes=%s", host, url.QueryEscape(cfg.AppID), url.QueryEscape(recommended))
+	consoleURL := fmt.Sprintf("%s/page/scope-apply?clientID=%s&scopes=%s",
+		strings.TrimRight(core.ResolveEndpoints(cfg.Brand).Open, "/"),
+		url.QueryEscape(cfg.AppID),
+		url.QueryEscape(recommended))
 
 	// Clear raw API detail — useful info is now in message/hint/console_url
 	exitErr.Detail.Detail = nil

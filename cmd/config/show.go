@@ -56,6 +56,7 @@ func configShowRun(opts *ConfigShowOptions) error {
 	if app == nil {
 		return output.ErrWithHint(output.ExitValidation, "config", "no active profile", "run: lark-cli profile list")
 	}
+	endpoints := core.ResolveEndpoints(app.Brand)
 	users := "(no logged-in users)"
 	if len(app.Users) > 0 {
 		var userStrs []string
@@ -70,8 +71,14 @@ func configShowRun(opts *ConfigShowOptions) error {
 		"appId":     app.AppId,
 		"appSecret": "****",
 		"brand":     app.Brand,
-		"lang":      app.Lang,
-		"users":     users,
+		"endpoints": map[string]string{
+			"open":     endpoints.Open,
+			"accounts": endpoints.Accounts,
+			"mcp":      endpoints.MCP,
+			"appLink":  endpoints.AppLink,
+		},
+		"lang":  app.Lang,
+		"users": users,
 	})
 	fmt.Fprintf(f.IOStreams.ErrOut, "\nConfig file path: %s\n", core.GetConfigPath())
 	return nil
